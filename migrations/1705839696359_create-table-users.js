@@ -17,7 +17,7 @@ exports.up = (pgm) => {
             type: 'text',
             notNull: true,
         },
-        fullName: {
+        fullname: {
             type: 'text',
             notNull: true,
         },
