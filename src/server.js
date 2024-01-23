@@ -1,27 +1,37 @@
+// mengimpor dotenv dan menjalankan konfigurasinya
 require('dotenv').config();
 
 const Hapi = require('@hapi/hapi');
 const Jwt = require('@hapi/jwt');
 
+// notes
 const notes = require('./api/notes');
 const NotesService = require('./service/postgres/NotesService');
 const NotesValidator = require('./validator/notes');
 const ClientError = require('./exceptions/ClientError');
 
+// users
 const users = require('./api/users');
 const UsersService = require('./service/postgres/UsersService');
 const UsersValidator = require('./validator/users');
 
+// authentications
 const authentications = require('./api/authentications');
 const AuthenticationsService = require('./service/postgres/AuthenticationsService');
 const TokenManager = require('./tokenize/TokenManager');
 const AuthenticationsValidator = require('./validator/authentications');
 
+// collaborations
+const collaborations = require('./api/collaborations');
+const CollaborationsService = require('./service/postgres/CollaborationsService');
+const CollaborationsValidator = require('./validator/collaborations');
+
 const init = async () => {
-  const notesService = new NotesService();
+  const collaborationsService = new CollaborationsService();
+  const notesService = new NotesService(collaborationsService);
   const usersService = new UsersService();
   const authenticationsService = new AuthenticationsService();
-  
+
   const server = Hapi.server({
     port: process.env.PORT,
     host: process.env.HOST,
@@ -32,12 +42,14 @@ const init = async () => {
     },
   });
 
+  // registrasi plugin eksternal
   await server.register([
     {
       plugin: Jwt,
     },
   ]);
 
+  // mendefinisikan strategy autentikasi jwt
   server.auth.strategy('notesapp_jwt', 'jwt', {
     keys: process.env.ACCESS_TOKEN_KEY,
     verify: {
@@ -46,10 +58,10 @@ const init = async () => {
       sub: false,
       maxAgeSec: process.env.ACCESS_TOKEN_AGE,
     },
-    validate: (artifacs) => ({
+    validate: (artifacts) => ({
       isValid: true,
       credentials: {
-        id: artifacs.decoded.payload.id,
+        id: artifacts.decoded.payload.id,
       },
     }),
   });
@@ -76,6 +88,14 @@ const init = async () => {
         usersService,
         tokenManager: TokenManager,
         validator: AuthenticationsValidator,
+      },
+    },
+    {
+      plugin: collaborations,
+      options: {
+        collaborationsService,
+        notesService,
+        validator: CollaborationsValidator,
       },
     },
   ]);
